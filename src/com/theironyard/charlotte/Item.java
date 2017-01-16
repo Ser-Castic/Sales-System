@@ -1,50 +1,80 @@
 package com.theironyard.charlotte;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
+/**
+ * Created by Ben on 1/15/17.
+ */
 public class Item {
-    Integer itemId;
-    String itemName;
-    Integer itemQuantity;
-    Double itemAmount;
+    private int id;
+    private String name;
+    private int quantity;
+    private double price;
+    private int orderId;
 
-    public Item() {
+    public Item(String name, int quantity, double price, int orderId) {
+        this.name = name;
+        this.quantity = quantity;
+        this.price = price;
+        this.orderId = orderId;
     }
 
-    public Item(Integer itemId, String itemName, Integer itemQuantity, Double itemAmount) {
-        this.itemId = itemId;
-        this.itemName = itemName;
-        this.itemQuantity = itemQuantity;
-        this.itemAmount = itemAmount;
+    public Item(int id, String name, int quantity, double price, int orderId) {
+        this.id = id;
+        this.name = name;
+        this.quantity = quantity;
+        this.price = price;
+        this.orderId = orderId;
     }
 
-    public Integer getItemId() {
-        return itemId;
+    public int getId() {
+        return id;
     }
 
-    public void setItemId(Integer itemId) {
-        this.itemId = itemId;
+    public void setId(int id) {
+        this.id = id;
     }
 
-    public String getItemName() {
-        return itemName;
+    public String getName() {
+        return name;
     }
 
-    public void setItemName(String itemName) {
-        this.itemName = itemName;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public Integer getItemQuantity() {
-        return itemQuantity;
+    public int getQuantity() {
+        return quantity;
     }
 
-    public void setItemQuantity(Integer itemQuantity) {
-        this.itemQuantity = itemQuantity;
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
     }
 
-    public Double getItemAmount() {
-        return itemAmount;
+    public double getPrice() {
+        return price;
     }
 
-    public void setItemAmount(Double itemAmount) {
-        this.itemAmount = itemAmount;
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    public int getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(int orderId) {
+        this.orderId = orderId;
+    }
+
+    public static void insertItem(Connection conn, Item item) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("INSERT INTO items VALUES (NULL, ?, ?, ?, ?)");
+        stmt.setString(1, item.name);
+        stmt.setInt(2, item.quantity);
+        stmt.setDouble(3, item.price);
+        stmt.setInt(4, item.orderId);
+        stmt.execute();
     }
 }

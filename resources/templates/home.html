@@ -1,9 +1,14 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Home</title>
+</head>
 <body>
-<form action="/home" method="get">
-    <button type="submit">Logout</button>
-</form>
-Hello, {{name}}!
-Email: {{email}}
+{{#user}}
+<span>Hello {{name}}, your email address is: {{email}}.</span>
+{{/user}}
+
+<h1>Inserted Order ID: {{order_id}}</h1>
 </body>
 </html>

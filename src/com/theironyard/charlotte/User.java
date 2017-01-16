@@ -5,99 +5,97 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class User {
-    Integer userId;
-    String userName;
-    String userEmail;
-    ArrayList<Order> userOrders;
+    private int id;
+    private String name;
+    private String email;
+    private List<Order> orders;
 
-    public User() {
+    public User(int id, String name, String email) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
     }
 
-    public User(Integer userId) {
-        this.userId = userId;
+    public User(String name, String email) {
+        this.name = name;
+        this.email = email;
     }
 
-    public User(String userName, String userEmail) {
-        this.userName = userName;
-        this.userEmail = userEmail;
+    public List<Order> getOrders() {
+        return orders;
     }
 
-    public User(Integer userId, String userName, String userEmail) {
-        this.userId = userId;
-        this.userName = userName;
-        this.userEmail = userEmail;
+    public void setOrders(List<Order> orders) {
+        this.orders = orders;
     }
 
-    public Integer getUserId() {
-        return userId;
+    public int getId() {
+        return id;
     }
 
-    public void setUserId(Integer userId) {
-        this.userId = userId;
+    public void setId(int id) {
+        this.id = id;
     }
 
-    public String getUserName() {
-        return userName;
+    public String getName() {
+        return name;
     }
 
-    public void setUserName(String userName) {
-        this.userName = userName;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public String getUserEmail() {
-        return userEmail;
+    public String getEmail() {
+        return email;
     }
 
-    public void setUserEmail(String userEmail) {
-        this.userEmail = userEmail;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
-    public ArrayList<Order> getUserOrders() {
-        return userOrders;
-    }
+    public static User selectUserById(Connection conn, Integer id) throws SQLException {
+        User user = null;
 
-    public void setUserOrders(ArrayList<Order> userOrders) {
-        this.userOrders = userOrders;
-    }
-
-
-    public static User selectUserById(Connection conn, User currentUser) throws SQLException {
-        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
-        stmt.setInt(1, currentUser.getUserId());
-
-        ResultSet results = stmt.executeQuery();
-        if (results.next()) {
-            return makeUser(results);
-        } else {
-            return null;
+        if (id != null) {
+            PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
+            stmt.setInt(1, id);
+            ResultSet results = stmt.executeQuery();
+            if (results.next()) {
+                user = makeUser(results);
+                user.setOrders(Order.getOrdersForUser(conn, id));
+            }
         }
+        return user;
     }
 
     public static User makeUser(ResultSet results) throws SQLException{
         int id = results.getInt("id");
-        String userName = results.getString("username");
+        String name = results.getString("username");
         String email = results.getString("email");
-        return new User(id, userName, email);
+        return new User(id, name, email);
     }
 
-    public static User selectUserByNameAndEmail(Connection conn, User currentUser) throws SQLException{
-        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE upper(username) = ? and upper(email) = ?");
-        stmt.setString(1, currentUser.getUserName().toUpperCase());
-        stmt.setString(2, currentUser.getUserEmail().toUpperCase());
-        ResultSet results = stmt.executeQuery();
-        if(results.next()) {
-            return makeUser(results);
-        } else {
-            return null;
+    public static Integer selectUserByEmail(Connection conn, String email) throws SQLException {
+        Integer userId = null;
+
+        if (email != null) {
+            PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE upper(email) = ?");
+            stmt.setString(1, email.toUpperCase());
+            ResultSet results = stmt.executeQuery();
+            if (results.next()) {
+                userId = results.getInt("id");
+            }
         }
+        return userId;
     }
 
     public static void insertUser(Connection conn, User newUser) throws SQLException {
         PreparedStatement stmt = conn.prepareStatement("INSERT INTO users VALUES (NULL, ?, ?)");
-        stmt.setString(1, newUser.getUserName());
-        stmt.setString(2, newUser.getUserEmail());
+        stmt.setString(1, newUser.getName());
+        stmt.setString(2, newUser.getEmail());
         stmt.execute();
     }
 }

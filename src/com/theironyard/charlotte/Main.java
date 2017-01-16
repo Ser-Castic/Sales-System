@@ -1,6 +1,5 @@
 package com.theironyard.charlotte;
 
-import jodd.json.JsonSerializer;
 import org.h2.tools.Server;
 import spark.ModelAndView;
 import spark.Session;
@@ -8,15 +7,14 @@ import spark.Spark;
 import spark.template.mustache.MustacheTemplateEngine;
 
 import java.sql.*;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 public class Main {
 
     public static void createTables(Connection conn) throws SQLException {
         Statement stmt = conn.createStatement();
-        stmt.execute("CREATE TABLE IF NOT EXISTS users (id IDENTITY, username VARCHAR, email VARCHAR)");
-        stmt.execute("CREATE TABLE IF NOT EXISTS items (id IDENTITY, item_name VARCHAR, item_quantity INT, item_price DOUBLE, order_id INT)");
+        stmt.execute("CREATE TABLE IF NOT EXISTS users (id IDENTITY, name VARCHAR, email VARCHAR)");
+        stmt.execute("CREATE TABLE IF NOT EXISTS items (id IDENTITY, name VARCHAR, quantity INT, price DOUBLE, order_id INT)");
         stmt.execute("CREATE TABLE IF NOT EXISTS orders (id IDENTITY, user_id INT)");
     }
 
@@ -29,45 +27,65 @@ public class Main {
         Connection conn = DriverManager.getConnection("jdbc:h2:./main");
         createTables(conn);
 
-//        Spark.externalStaticFileLocation("public");
-        Spark.init();
+        Spark.get("/", (request, response) -> {
+            HashMap model = new HashMap();
+            Session session = request.session();
 
-        Spark.get(
-                "/",
-                ((request, response) -> {
-                    HashMap m = new HashMap();
+            User current = User.selectUserById(conn, session.attribute("the_user"));
 
-                    Session session = request.session();
-                    Integer userId = session.attribute("userId");
+            if (current != null) {
+                // pass user into model
+                model.put("user", current);
+                model.put("order_id", Order.insertOrder(conn, current.getId()));
 
-                    User currentUser = User.selectUserById(conn, new User(userId));
+//                session.attribute("orderid", insertOrder(current.getId()));
 
-                    if (currentUser == null) {
-                        return new ModelAndView(m, "login.html");
-                    } else {
-                        m.put("name", currentUser.userName);
-                        m.put("email", currentUser.userEmail);
-                        return new ModelAndView(m, "home.html");
-                    }
-                }),
-                new MustacheTemplateEngine()
-        );
+                return new ModelAndView(model, "home.html");
+            } else {
+                return new ModelAndView(model, "login.html");
+            }
+        }, new MustacheTemplateEngine());
 
-        Spark.post(
-                "/login",
-                (request, response) -> {
-                    String name = request.queryParams("loginName");
-                    String email = request.queryParams("loginEmail");
-                    User.insertUser(conn, new User(name, email));
-                    User user = User.selectUserByNameAndEmail(conn, new User(name, email));
+        Spark.post("/login", (request, response) -> {
+            String email = request.queryParams("email");
 
-                    Session session = request.session();
-                    session.attribute("id", user.getUserId());
-                    session.attribute("userName", user.getUserName());
-                    session.attribute("userEmail", user.getUserEmail());
+            // look up the user by email address
+            Integer userId = User.selectUserByEmail(conn, email);
 
-                    response.redirect("/");
-                    return "";
-                });
+            // if the user exists, save the id in session.
+            if (userId != null) {
+                Session session = request.session();
+                session.attribute("the_user", userId);
+            }
+            response.redirect("/");
+            return "";
+        });
+
+        Spark.post("/items", (request, response) -> {
+            Session session = request.session();
+
+            User current = User.selectUserById(conn, session.attribute("the_user"));
+
+            if (current != null) {
+                // see if there is a current order
+                Order currentOrder = Order.getLatestCurrentOrder(conn, current.getId());
+
+                if (currentOrder == null) {
+                    // if not, make a new one
+                    int orderId = Order.insertOrder(conn, current.getId());
+
+                    // get item from post data
+                    Item postedItem = new Item(request.queryParams("name"),
+                            Integer.valueOf(request.queryParams("quantity")),
+                            Double.valueOf("price"), orderId);
+
+                    // add item to order
+                    Item.insertItem(conn, postedItem);
+                }
+            }
+            // redirect
+            response.redirect("/");
+            return "";
+        });
     }
 }
