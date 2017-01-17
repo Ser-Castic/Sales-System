@@ -1,8 +1,5 @@
 package com.theironyard.charlotte;
 
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -55,41 +52,5 @@ public class Order {
 
     public void setUserId(int userId) {
         this.userId = userId;
-    }
-
-    public static List<Order> getOrdersForUser(Connection conn, Integer userId) throws SQLException {
-        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM orders WHERE user_id = ?");
-        stmt.setInt(1, userId);
-        ResultSet results = stmt.executeQuery();
-
-        return new ArrayList<Order>((Collection<? extends Order>) results);
-}
-
-    public static Order getLatestCurrentOrder(Connection conn, Integer userId) throws SQLException {
-        Order order = null;
-
-        if (userId != null) {
-            PreparedStatement stmt = conn.prepareStatement("SELECT TOP 1 * FROM orders Where user_id = ? and complete = false");
-
-            ResultSet results = stmt.executeQuery();
-
-            if (results.next()) {
-                order = new Order(results.getInt("id"), results.getInt("user_id"), false);
-            }
-        }
-
-        return order;
-    }
-
-    public static int insertOrder(Connection conn, int userId) throws SQLException {
-        PreparedStatement stmt = conn.prepareStatement("INSERT INTO orders VALUES (NULL, ?)", Statement.RETURN_GENERATED_KEYS);
-        stmt.setInt(1, userId);
-        stmt.executeUpdate();
-
-        ResultSet keys =  stmt.getGeneratedKeys();
-
-        keys.next();
-
-        return keys.getInt(1);
     }
 }

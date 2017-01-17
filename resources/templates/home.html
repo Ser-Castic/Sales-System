@@ -5,10 +5,22 @@
     <title>Home</title>
 </head>
 <body>
-{{#user}}
-<span>Hello {{name}}, your email address is: {{email}}.</span>
+</br>
+{{#user}}Hello {{name}}, your email address is: {{email}}.
 {{/user}}
-
+</br>
+</br>
+Create Items for your order:
+<form action="/items" method="post">
+    <input type="text" placeholder="Enter item name" name="itemName"/>
+    <input type="text" placeholder="Enter quantity" name="quantity"/>
+    <input type="text" placeholder="Enter item price" name="price"/>
+    <button type ="submit">Enter</button>
+</form>
+</br>
 <h1>Inserted Order ID: {{order_id}}</h1>
+<form action="/logout" method="post">
+    <button type="submit">Logout</button>
+</form>
 </body>
 </html>

@@ -7,7 +7,9 @@ import spark.Spark;
 import spark.template.mustache.MustacheTemplateEngine;
 
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class Main {
 
@@ -15,7 +17,95 @@ public class Main {
         Statement stmt = conn.createStatement();
         stmt.execute("CREATE TABLE IF NOT EXISTS users (id IDENTITY, name VARCHAR, email VARCHAR)");
         stmt.execute("CREATE TABLE IF NOT EXISTS items (id IDENTITY, name VARCHAR, quantity INT, price DOUBLE, order_id INT)");
-        stmt.execute("CREATE TABLE IF NOT EXISTS orders (id IDENTITY, user_id INT)");
+        stmt.execute("CREATE TABLE IF NOT EXISTS orders (id IDENTITY, complete BOOLEAN user_id INT)");
+    }
+
+    public static List<Order> getOrdersForUser(Connection conn, Integer userId) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM orders WHERE user_id = ?");
+        stmt.setInt(1, userId);
+        ResultSet results = stmt.executeQuery();
+
+        return new ArrayList<>();
+    }
+
+    public static Order getLatestCurrentOrder(Connection conn, Integer userId) throws SQLException {
+        Order order = null;
+
+        if (userId != null) {
+            PreparedStatement stmt = conn.prepareStatement("SELECT TOP 1 * FROM orders Where id = ? and complete = false");
+
+            ResultSet results = stmt.executeQuery();
+
+            if (results.next()) {
+                order = new Order(results.getInt("id"), results.getInt("user_id"), false);
+            }
+        }
+
+        return order;
+    }
+
+    public static int insertOrder(Connection conn, int userId) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("INSERT INTO orders VALUES (NULL, ?)", Statement.RETURN_GENERATED_KEYS);
+        stmt.setInt(1, userId);
+        stmt.executeUpdate();
+
+        ResultSet keys =  stmt.getGeneratedKeys();
+
+        keys.next();
+
+        return keys.getInt(1);
+    }
+
+    public static User selectUserById(Connection conn, Integer id) throws SQLException {
+        User user = null;
+
+        if (id != null) {
+            PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
+            stmt.setInt(1, id);
+            ResultSet results = stmt.executeQuery();
+            if (results.next()) {
+                user = makeUser(results);
+//                user.setOrders(Order.getOrdersForUser(conn, id));
+            }
+        }
+        return user;
+    }
+
+    public static User makeUser(ResultSet results) throws SQLException{
+        int id = results.getInt("id");
+        String name = results.getString("name");
+        String email = results.getString("email");
+        return new User(id, name, email);
+    }
+
+    public static Integer selectUserByEmail(Connection conn, String email) throws SQLException {
+        Integer userId = null;
+
+        if (email != null) {
+            PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE email = ?");
+            stmt.setString(1, email);
+            ResultSet results = stmt.executeQuery();
+            if (results.next()) {
+                userId = results.getInt("id");
+            }
+        }
+        return userId;
+    }
+
+    public static void insertUser(Connection conn, String name, String email) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("INSERT INTO users VALUES (NULL, ?, ?)");
+        stmt.setString(1, name);
+        stmt.setString(2, email);
+        stmt.execute();
+    }
+
+    public static void insertItem(Connection conn, Item item) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("INSERT INTO items VALUES (NULL, ?, ?, ?, ?)");
+        stmt.setString(1, item.getName());
+        stmt.setInt(2, item.getQuantity());
+        stmt.setDouble(3, item.getPrice());
+        stmt.setInt(4, item.getOrderId());
+        stmt.execute();
     }
 
     public static void main(String[] args) throws SQLException {
@@ -27,65 +117,85 @@ public class Main {
         Connection conn = DriverManager.getConnection("jdbc:h2:./main");
         createTables(conn);
 
-        Spark.get("/", (request, response) -> {
-            HashMap model = new HashMap();
-            Session session = request.session();
+        Spark.get(
+                "/",
+                ((request, response) -> {
+                    HashMap m = new HashMap();
+                    Session session = request.session();
 
-            User current = User.selectUserById(conn, session.attribute("the_user"));
+                    Integer userId = session.attribute("userId");
+                    if (userId == null) {//if we don't have a User name lets ask them to log in
+                        return new ModelAndView(m, "login.html");
+                    } else {//we have one...yay! lets make a view
+                        User currentUser = selectUserById(conn, userId);
+                        m.put("user", currentUser);
+                        return new ModelAndView(m, "home.html");
+                    }
+                }),
+                new MustacheTemplateEngine()
+        );
 
-            if (current != null) {
-                // pass user into model
-                model.put("user", current);
-                model.put("order_id", Order.insertOrder(conn, current.getId()));
-
-//                session.attribute("orderid", insertOrder(current.getId()));
-
-                return new ModelAndView(model, "home.html");
-            } else {
-                return new ModelAndView(model, "login.html");
-            }
-        }, new MustacheTemplateEngine());
-
-        Spark.post("/login", (request, response) -> {
-            String email = request.queryParams("email");
-
-            // look up the user by email address
-            Integer userId = User.selectUserByEmail(conn, email);
-
-            // if the user exists, save the id in session.
-            if (userId != null) {
-                Session session = request.session();
-                session.attribute("the_user", userId);
-            }
-            response.redirect("/");
-            return "";
-        });
+        Spark.post(
+                "/login",
+                ((request, response) -> {
+                    String email = request.queryParams("email");
+                    String name = request.queryParams("name");
+                    Integer userId = selectUserByEmail(conn, email);
+                    if(userId != null) {
+                        User currentUser = selectUserById(conn, userId);
+                        Session session = request.session();
+                        session.attribute("userId", currentUser.getId());
+                        response.redirect("/");
+                    } else {
+                        insertUser(conn, name, email);
+                        Integer newUserId = selectUserByEmail(conn, email);
+                        User currentUser = selectUserById(conn, newUserId);
+                        Session session = request.session();
+                        session.attribute("userId", currentUser.getId());
+                        response.redirect("/");
+                    }
+                    return "";
+                })
+        );
 
         Spark.post("/items", (request, response) -> {
             Session session = request.session();
 
-            User current = User.selectUserById(conn, session.attribute("the_user"));
+            User current = selectUserById(conn, session.attribute("userId"));
 
             if (current != null) {
                 // see if there is a current order
-                Order currentOrder = Order.getLatestCurrentOrder(conn, current.getId());
+                Order currentOrder = getLatestCurrentOrder(conn, current.getId());
 
                 if (currentOrder == null) {
                     // if not, make a new one
-                    int orderId = Order.insertOrder(conn, current.getId());
+                    int orderId = insertOrder(conn, current.getId());
 
                     // get item from post data
-                    Item postedItem = new Item(request.queryParams("name"),
+                    Item postedItem = new Item(request.queryParams("itemName"),
                             Integer.valueOf(request.queryParams("quantity")),
-                            Double.valueOf("price"), orderId);
-
+                            Double.valueOf(request.queryParams("price")), Integer.valueOf(request.params("orderId")));
+                    System.out.println(postedItem.getName());
+                    System.out.println(postedItem.getQuantity());
+                    System.out.println(postedItem.getPrice());
+                    System.out.println(postedItem.getOrderId());
                     // add item to order
-                    Item.insertItem(conn, postedItem);
+                    insertItem(conn, postedItem);
                 }
             }
             // redirect
             response.redirect("/");
             return "";
         });
+
+        Spark.post(
+                "/logout",
+                ((request, response) -> {
+                    Session session = request.session();
+                    session.invalidate();
+                    response.redirect("/");
+                    return "";
+                })
+        );
     }
 }
