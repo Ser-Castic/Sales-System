@@ -14,6 +14,13 @@ public class User {
         this.email = email;
     }
 
+    public User(int id, String name, String email, List<Order> orders) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.orders = orders;
+    }
+
     public User(String name, String email) {
         this.name = name;
         this.email = email;

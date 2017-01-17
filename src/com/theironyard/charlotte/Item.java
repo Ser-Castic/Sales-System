@@ -14,6 +14,12 @@ public class Item {
         this.orderId = orderId;
     }
 
+    public Item(String name, int quantity, double price) {
+        this.name = name;
+        this.quantity = quantity;
+        this.price = price;
+    }
+
     public Item(int id, String name, int quantity, double price, int orderId) {
         this.id = id;
         this.name = name;

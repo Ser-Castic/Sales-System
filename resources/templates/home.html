@@ -18,7 +18,13 @@ Create Items for your order:
     <button type ="submit">Enter</button>
 </form>
 </br>
-<h1>Inserted Order ID: {{order_id}}</h1>
+<h1>Inserted Order ID:</h1>
+{{#orders}}These are the orders: {{orders}}.
+{{/orders}}
+</br>
+</br>
+{{#items}}These are the items: {{items}}.
+{{/items}}
 <form action="/logout" method="post">
     <button type="submit">Logout</button>
 </form>

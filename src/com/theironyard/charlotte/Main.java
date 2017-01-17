@@ -17,36 +17,51 @@ public class Main {
         Statement stmt = conn.createStatement();
         stmt.execute("CREATE TABLE IF NOT EXISTS users (id IDENTITY, name VARCHAR, email VARCHAR)");
         stmt.execute("CREATE TABLE IF NOT EXISTS items (id IDENTITY, name VARCHAR, quantity INT, price DOUBLE, order_id INT)");
-        stmt.execute("CREATE TABLE IF NOT EXISTS orders (id IDENTITY, complete BOOLEAN user_id INT)");
+        stmt.execute("CREATE TABLE IF NOT EXISTS orders (id IDENTITY, complete BOOLEAN, user_id INT)");
     }
 
     public static List<Order> getOrdersForUser(Connection conn, Integer userId) throws SQLException {
+        List<Order> orderList = new ArrayList<>();
         PreparedStatement stmt = conn.prepareStatement("SELECT * FROM orders WHERE user_id = ?");
         stmt.setInt(1, userId);
         ResultSet results = stmt.executeQuery();
+        while(results.next()) {
+            orderList.add(new Order(results.getInt("id"), results.getInt("user_id"), results.getBoolean("complete")));
+        }
+        return orderList;
+    }
 
-        return new ArrayList<>();
+    public static List<Item> getItemsForOrder(Connection conn, Integer orderId) throws SQLException {
+        List<Item> itemsList = new ArrayList<>();
+        PreparedStatement stmt = conn.prepareStatement("SELECT * FROM items where order_id = ?");
+        stmt.setInt(1, orderId);
+        ResultSet result = stmt.executeQuery();
+        while(result.next()) {
+            itemsList.add(new Item(result.getString("name"), result.getInt("quantity"), result.getDouble("price")));
+        }
+        return itemsList;
     }
 
     public static Order getLatestCurrentOrder(Connection conn, Integer userId) throws SQLException {
         Order order = null;
 
         if (userId != null) {
-            PreparedStatement stmt = conn.prepareStatement("SELECT TOP 1 * FROM orders Where id = ? and complete = false");
-
+            PreparedStatement stmt = conn.prepareStatement("SELECT * FROM orders Where user_id = ? and complete = false");
+            stmt.setInt(1, userId);
             ResultSet results = stmt.executeQuery();
 
             if (results.next()) {
-                order = new Order(results.getInt("id"), results.getInt("user_id"), false);
+                order = new Order(results.getInt("id"), results.getInt("user_id"), results.getBoolean("complete"));
             }
         }
 
         return order;
     }
 
-    public static int insertOrder(Connection conn, int userId) throws SQLException {
-        PreparedStatement stmt = conn.prepareStatement("INSERT INTO orders VALUES (NULL, ?)", Statement.RETURN_GENERATED_KEYS);
+    public static int insertOrder(Connection conn, int userId, boolean complete) throws SQLException {
+        PreparedStatement stmt = conn.prepareStatement("INSERT INTO orders VALUES (NULL, ?, ?)", Statement.RETURN_GENERATED_KEYS);
         stmt.setInt(1, userId);
+        stmt.setBoolean(2, complete);
         stmt.executeUpdate();
 
         ResultSet keys =  stmt.getGeneratedKeys();
@@ -128,7 +143,12 @@ public class Main {
                         return new ModelAndView(m, "login.html");
                     } else {//we have one...yay! lets make a view
                         User currentUser = selectUserById(conn, userId);
+                        List<Order> orders =  getOrdersForUser(conn, currentUser.getId());
+                        List<Item> items =  getItemsForOrder(conn, currentUser.getId());
+
                         m.put("user", currentUser);
+                        m.put("orders", orders);
+                        m.put("items", items);
                         return new ModelAndView(m, "home.html");
                     }
                 }),
@@ -160,7 +180,6 @@ public class Main {
 
         Spark.post("/items", (request, response) -> {
             Session session = request.session();
-
             User current = selectUserById(conn, session.attribute("userId"));
 
             if (current != null) {
@@ -169,19 +188,16 @@ public class Main {
 
                 if (currentOrder == null) {
                     // if not, make a new one
-                    int orderId = insertOrder(conn, current.getId());
+                    insertOrder(conn, current.getId(), false);
 
                     // get item from post data
                     Item postedItem = new Item(request.queryParams("itemName"),
                             Integer.valueOf(request.queryParams("quantity")),
-                            Double.valueOf(request.queryParams("price")), Integer.valueOf(request.params("orderId")));
-                    System.out.println(postedItem.getName());
-                    System.out.println(postedItem.getQuantity());
-                    System.out.println(postedItem.getPrice());
-                    System.out.println(postedItem.getOrderId());
+                            Double.valueOf(request.queryParams("price")));
                     // add item to order
                     insertItem(conn, postedItem);
                 }
+
             }
             // redirect
             response.redirect("/");

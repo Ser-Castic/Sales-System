@@ -2,9 +2,6 @@ package com.theironyard.charlotte;
 
 import java.util.List;
 
-/**
- * Created by Ben on 1/15/17.
- */
 public class Order {
     private int id;
     private int userId;
